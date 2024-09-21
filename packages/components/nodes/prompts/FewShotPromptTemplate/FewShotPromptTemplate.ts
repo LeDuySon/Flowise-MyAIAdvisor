@@ -30,9 +30,9 @@ class FewShotPromptTemplate_Prompts implements INode {
                 type: 'string',
                 rows: 4,
                 placeholder: `[
-  { "word": "happy", "antonym": "sad" },
-  { "word": "tall", "antonym": "short" },
-]`
+                    { "word": "happy", "antonym": "sad" },
+                    { "word": "tall", "antonym": "short" },
+                    ]`
             },
             {
                 label: 'Example Prompt',

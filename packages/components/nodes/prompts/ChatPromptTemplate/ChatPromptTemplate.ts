@@ -51,6 +51,14 @@ class ChatPromptTemplate_Prompts implements INode {
         this.baseClasses = [this.type, ...getBaseClasses(ChatPromptTemplate)]
         this.inputs = [
             {
+                label: 'Prompt Description',
+                name: 'promptDescription',
+                type: 'string',
+                rows: 2,
+                placeholder: `Description the role of this prompt`,
+                optional: true
+            },
+            {
                 label: 'System Message',
                 name: 'systemMessagePrompt',
                 type: 'string',
