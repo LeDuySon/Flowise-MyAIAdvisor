@@ -33,6 +33,11 @@ function getRouteOutput(extraInfoStr: string): ICommonObject {
     return parseStrToJson(routeOutputStr)
 }
 
+function getDatabaseCredentials(extraInfoStr: string): string {
+    const extraInfo = parseStrToJson(extraInfoStr)
+    return extraInfo?.databaseCred
+}
+
 function prepareContext(retrievedContext: string[]): string {
     return retrievedContext.join("\n").replace("\n\n", "\n")
 }
@@ -54,4 +59,4 @@ function postprocessOutput(output: string, productIdGroup: Record<string, any[]>
 }
 
 
-export { constructFakeLink, getRouteOutput, getProductIDsFromDocs, prepareContext, postprocessOutput };
+export { constructFakeLink, getRouteOutput, getProductIDsFromDocs, prepareContext, postprocessOutput, getDatabaseCredentials };

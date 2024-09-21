@@ -9,7 +9,7 @@ import {
 import { ConsoleCallbackHandler, CustomChainHandler, additionalCallbacks } from '../../../src/handler'
 import { FlowiseMemory, IMessage, ICommonObject, INode, INodeData, INodeParams } from '../../../src/Interface'
 import { getBaseClasses } from '../../../src/utils'
-import { constructFakeLink, getRouteOutput, getProductIDsFromDocs, prepareContext, postprocessOutput } from './utils';
+import { constructFakeLink, getRouteOutput, getProductIDsFromDocs, prepareContext, postprocessOutput, getDatabaseCredentials } from './utils';
 import { PostgresDB, QueryParams } from './postgresDB'
 
 

@@ -9,7 +9,7 @@ import { getBaseClasses } from '../../../src/utils'
 import { checkInputs, Moderation, streamResponse } from '../../moderation/Moderation'
 import { formatResponse } from '../../outputparsers/OutputParserHelpers'
 import { PostgresDB, QueryParams } from './postgresDB';
-import { constructFakeLink, getRouteOutput, getProductIDsFromDocs, prepareContext, postprocessOutput } from './utils';
+import { constructFakeLink, getRouteOutput, getProductIDsFromDocs, prepareContext, postprocessOutput, getDatabaseCredentials } from './utils';
 
 enum UserIntent {
     COMPARE_PRICE = "compare_price",
@@ -175,22 +175,11 @@ class DetectedIntentYitec_Chains implements INode {
     async run(nodeData: INodeData, input: string, options: ICommonObject): Promise<string | object> {
         const chain = nodeData.instance as ConversationalRetrievalQAChain
         const vectorStoreRetriever = nodeData.inputs?.vectorStoreRetriever as BaseRetriever
-        const moderations = nodeData.inputs?.inputModeration as Moderation[]
         const extraInfo = nodeData.inputs?.extraInfo 
         
         const routeOutput = getRouteOutput(extraInfo)
         console.log("routeOutput: ", routeOutput)
 
-        if (moderations && moderations.length > 0) {
-            try {
-                // Use the output of the moderation chain as input for the Retrieval QA Chain
-                input = await checkInputs(moderations, input)
-            } catch (e) {
-                await new Promise((resolve) => setTimeout(resolve, 500))
-                streamResponse(options.socketIO && options.socketIOClientId, e.message, options.socketIO, options.socketIOClientId)
-                return formatResponse(e.message)
-            }
-        }
 
         const loggerHandler = new ConsoleCallbackHandler(options.logger)
         const callbacks = await additionalCallbacks(nodeData, options)

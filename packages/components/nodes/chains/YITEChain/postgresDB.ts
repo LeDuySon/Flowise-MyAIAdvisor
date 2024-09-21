@@ -14,7 +14,13 @@ class PostgresDB {
 
     constructor() {
         this.pool = new Pool({
+            connectionString: process.env.DATABASE_POSTGRES_CONNECTION_STRING,
+            ssl: {
+                rejectUnauthorized: false // Set this based on your SSL requirements
+            }
         });
+
+        console.log('Connect to database with credentials: ', process.env.DATABASE_POSTGRES_CONNECTION_STRING);
 
         this.table_name = 'product_links'
     }
