@@ -1,15 +1,17 @@
-import { BaseRetriever } from '@langchain/core/retrievers'
 import { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { ConversationalRetrievalQAChain } from 'langchain/chains'
 import { Document } from "@langchain/core/documents";
-import { ChatPromptTemplate } from '@langchain/core/prompts'
+import {
+    ChatPromptTemplate,
+    MessagesPlaceholder,
+} from '@langchain/core/prompts'
 import { ConsoleCallbackHandler, CustomChainHandler, additionalCallbacks } from '../../../src/handler'
-import { ICommonObject, INode, INodeData, INodeParams } from '../../../src/Interface'
+import { FlowiseMemory, ICommonObject, IMessage, INode, INodeData, INodeParams } from '../../../src/Interface'
 import { getBaseClasses } from '../../../src/utils'
-import { checkInputs, Moderation, streamResponse } from '../../moderation/Moderation'
-import { formatResponse } from '../../outputparsers/OutputParserHelpers'
 import { PostgresDB, QueryParams } from './postgresDB';
-import { constructFakeLink, getRouteOutput, getProductIDsFromDocs, prepareContext, postprocessOutput, getDatabaseCredentials } from './utils';
+import { constructFakeLink, getRouteOutput, getProductIDsFromDocs, prepareContext, postprocessOutput, getContextFromDocs } from './utils';
+import { DocumentWithScore, retrieveBasedOnKnowledgeType } from './retrieverUtils';
+import { VectorStore } from '@langchain/core/vectorstores';
 
 enum UserIntent {
     COMPARE_PRICE = "compare_price",
@@ -27,9 +29,10 @@ class DetectedIntentYitec_Chains implements INode {
     baseClasses: string[]
     description: string
     inputs: INodeParams[]
+    sessionId?: string
     database: PostgresDB
 
-    constructor() {
+    constructor(fields?: { sessionId?: string }) {
         this.label = 'Known Intent QA Chain'
         this.name = 'detectedIntentYitecChains'
         this.version = 1.0
@@ -57,9 +60,9 @@ class DetectedIntentYitec_Chains implements INode {
                 type: 'BasePromptTemplate'
             },
             {
-                label: 'Vector Store Retriever',
-                name: 'vectorStoreRetriever',
-                type: 'BaseRetriever'
+                label: 'Vector Store',
+                name: 'vectorStore',
+                type: 'VectorStore'
             },
             {
                 label: 'Memory',
@@ -77,13 +80,21 @@ class DetectedIntentYitec_Chains implements INode {
             }
         ]
         this.database = new PostgresDB()
+        console.log("Session ID knownIntentChain constructor: ", fields?.sessionId)
+        this.sessionId = fields?.sessionId
     }
 
     async init(nodeData: INodeData): Promise<any> {
         const model = nodeData.inputs?.model as BaseLanguageModel
         const prompt = nodeData.inputs?.prompt as ChatPromptTemplate
 
-        const chain = prompt.pipe(model)
+        // construct new prompt template with memory placeholder
+        const systemPrompt = prompt.promptMessages[0]
+        const humanPrompt = prompt.promptMessages[prompt.promptMessages.length - 1]
+        const messages = [systemPrompt, new MessagesPlaceholder('chat_history'), humanPrompt]
+        const newPrompt = ChatPromptTemplate.fromMessages(messages)
+
+        const chain = newPrompt.pipe(model)
         return chain
     }
 
@@ -100,7 +111,7 @@ class DetectedIntentYitec_Chains implements INode {
         })
 
         // parse price range from the route output if it exists
-        const minPrice = routeOutput?.priceRange?.minPrice 
+        const minPrice = routeOutput?.priceRange?.minPrice
         const maxPrice = routeOutput?.priceRange?.maxPrice
 
         // query the database
@@ -167,45 +178,107 @@ class DetectedIntentYitec_Chains implements INode {
 
                 updatedContext.push(context)
             }
-        } 
+        }
 
         return { context: prepareContext(updatedContext), productIdGroup }
     }
 
+    private async getContextForChatbot(knowledgeType2RetrievedDoc: Record<string, DocumentWithScore[]>, knowledgeTypes: string[], routeOutput: ICommonObject): Promise<{ finalContext: string, productIdGroup: Record<string, any[]> }> {
+        let finalContext: string = ''
+        let productIdGroup: Record<string, any[]> = {}
+
+        // Get general context for each knowledge type
+        const knowledgeType2GeneralContext = await this.database.getGeneralContextbyKnowledgeTypes(knowledgeTypes)
+
+        for (const knowledgeType of knowledgeTypes) {
+            const retrievedDoc = knowledgeType2RetrievedDoc[knowledgeType] ?? []
+            const generalContext = knowledgeType2GeneralContext[knowledgeType] ?? ''
+
+            let context: string = ''
+            // Get context from the retrieved documents
+            if (knowledgeType === "product") {
+                ({ context, productIdGroup } = await this.getContextBasedOnIntent(retrievedDoc, routeOutput))
+            } else {
+                ({ context } = await getContextFromDocs(retrievedDoc))
+            }
+
+            // Combine general context and retrieved context for the chatbot
+            // general context will help chatbot to understand the context better
+            finalContext += generalContext + "\n" + context
+        }
+
+        return { finalContext, productIdGroup }
+    }
+
     async run(nodeData: INodeData, input: string, options: ICommonObject): Promise<string | object> {
+        const memory = nodeData.inputs?.memory as FlowiseMemory
         const chain = nodeData.instance as ConversationalRetrievalQAChain
-        const vectorStoreRetriever = nodeData.inputs?.vectorStoreRetriever as BaseRetriever
-        const extraInfo = nodeData.inputs?.extraInfo 
-        
+        const vectorStore = nodeData.inputs?.vectorStore as VectorStore
+        const extraInfo = nodeData.inputs?.extraInfo
+
         const routeOutput = getRouteOutput(extraInfo)
         console.log("routeOutput: ", routeOutput)
 
+        // define the knowledge type, hardcoded for now
+        // let knowledgeTypes = routeOutput?.knowledgeType ?? undefined
+        // if (!knowledgeTypes) {
+        //     knowledgeTypes = ["product", "faq", "article"]
+        // } else {
+        //     knowledgeTypes.push("faq", "article", "product")
+        // }
+            
+        let knowledgeTypes = ["product", "faq", "article"]
 
+        // initialize the logger handler    
         const loggerHandler = new ConsoleCallbackHandler(options.logger)
         const callbacks = await additionalCallbacks(nodeData, options)
 
+        // get message history
+        const historyMessages = ((await memory.getChatMessages(this.sessionId, true)) as IMessage[]) ?? []
+        console.log("historyMessages: ", historyMessages)
+
+        let chatbotResp: string;
         if (options.socketIO && options.socketIOClientId) {
             const handler = new CustomChainHandler(options.socketIO, options.socketIOClientId)
-            const retrievedDoc = await vectorStoreRetriever.invoke(input, { callbacks: [loggerHandler, ...callbacks] })
-            const { context, productIdGroup } = await this.getContextBasedOnIntent(retrievedDoc, routeOutput)
-        
+            const knowledgeType2RetrievedDoc = await retrieveBasedOnKnowledgeType(input, vectorStore, knowledgeTypes, { callbacks: [loggerHandler, ...callbacks] })
+            const { finalContext, productIdGroup } = await this.getContextForChatbot(knowledgeType2RetrievedDoc, knowledgeTypes, routeOutput)
+
             const obj = {
                 question: input,
-                context: context,
+                context: finalContext,
+                chat_history: historyMessages
             }
             const res = await chain.invoke(obj, { callbacks: [loggerHandler, handler, ...callbacks] })
-            return postprocessOutput(res.text, productIdGroup)
+            chatbotResp = postprocessOutput(res.text, productIdGroup)
         } else {
-            const retrievedDoc = await vectorStoreRetriever.invoke(input, { callbacks: [loggerHandler, ...callbacks] })
-            const { context, productIdGroup } = await this.getContextBasedOnIntent(retrievedDoc, routeOutput)
-            
+            const knowledgeType2RetrievedDoc = await retrieveBasedOnKnowledgeType(input, vectorStore, knowledgeTypes, { callbacks: [loggerHandler, ...callbacks] })
+            const { finalContext, productIdGroup } = await this.getContextForChatbot(knowledgeType2RetrievedDoc, knowledgeTypes, routeOutput)
+
             const obj = {
                 question: input,
-                context: context,
+                context: finalContext,
+                chat_history: historyMessages
             }
             const res = await chain.invoke(obj, { callbacks: [loggerHandler, ...callbacks] })
-            return postprocessOutput(res.text, productIdGroup)
+            chatbotResp = postprocessOutput(res.text, productIdGroup)
         }
+
+        console.log("Session ID knownintentchain: ", this.sessionId)
+        await memory.addChatMessages(
+            [
+                {
+                    text: input,
+                    type: 'userMessage'
+                },
+                {
+                    text: chatbotResp,
+                    type: 'apiMessage'
+                }
+            ],
+            this.sessionId
+        )
+
+        return chatbotResp;
     }
 }
 

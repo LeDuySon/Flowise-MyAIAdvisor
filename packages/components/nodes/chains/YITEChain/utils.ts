@@ -1,5 +1,6 @@
 import { ICommonObject } from '../../../src/Interface'
 import { Document } from "@langchain/core/documents";
+import { DocumentWithScore } from './retrieverUtils'
 
 function constructFakeLink (provider: string, productId: string): string {
     // this function will construct fake link in format: https://{provider}.sg/{product_id}.
@@ -58,5 +59,11 @@ function postprocessOutput(output: string, productIdGroup: Record<string, any[]>
     return output;
 }
 
+// Get context from the retrieved documents for non-product-related questions
+async function getContextFromDocs(retrievedDoc: DocumentWithScore[]): Promise<{ context: string }> {
+    const context = prepareContext(retrievedDoc.map((doc) => doc.pageContent))
+    return { context }
+}
 
-export { constructFakeLink, getRouteOutput, getProductIDsFromDocs, prepareContext, postprocessOutput, getDatabaseCredentials };
+
+export { constructFakeLink, getRouteOutput, getProductIDsFromDocs, prepareContext, postprocessOutput, getDatabaseCredentials, getContextFromDocs };

@@ -143,6 +143,57 @@ class PostgresDB {
             throw error;
         }
     }
+
+    public async getGeneralContextbyKnowledgeType(knowledgeType: string): Promise<string> {
+        try {
+            // Connect to the PostgreSQL database
+            const client = await this.pool.connect();
+
+            // Execute the query
+            const result = await client.query(`SELECT * FROM knowledge_context WHERE knowledge_type = '${knowledgeType}'`);
+            console.log("General context: ", result.rows);
+
+            // Release the client back to the pool
+            client.release();
+
+            // Return the query result
+            if (result.rows.length === 0) {
+                return ''
+            } else {
+                return result.rows[0].general_context
+            }
+
+        } catch (error) {
+            // Handle any errors that occurred during the query
+            console.error('Error executing query:', error);
+            throw error;
+        }
+    }
+
+    public async getGeneralContextbyKnowledgeTypes(knowledgeTypes: string[]): Promise<Record<string, string>> {
+        try {
+            // Connect to the PostgreSQL database
+            const client = await this.pool.connect();           
+
+            const result = await client.query(`SELECT * FROM knowledge_context WHERE knowledge_type IN ('${knowledgeTypes.join("', '")}')`);
+
+            // Release the client back to the pool
+            client.release();
+
+            if (result.rows.length === 0) {
+                return {}
+            } else {
+                return result.rows.reduce((acc, row) => {
+                    acc[row.knowledge_type] = row.general_context;
+                    return acc;
+                }, {});
+            }
+        } catch (error) {
+            // Handle any errors that occurred during the query
+            console.error('Error executing query:', error);
+            throw error;
+        }
+    }
 }
 
 export { PostgresDB, QueryParams, QueryResult };
