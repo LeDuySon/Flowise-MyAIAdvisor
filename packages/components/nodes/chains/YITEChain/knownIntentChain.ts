@@ -220,15 +220,13 @@ class DetectedIntentYitec_Chains implements INode {
         console.log("routeOutput: ", routeOutput)
 
         // define the knowledge type, hardcoded for now
-        // let knowledgeTypes = routeOutput?.knowledgeType ?? undefined
-        // if (!knowledgeTypes) {
-        //     knowledgeTypes = ["product", "faq", "article"]
-        // } else {
-        //     knowledgeTypes.push("faq", "article", "product")
-        // }
+        let knowledgeTypes = routeOutput?.knowledgeType ?? undefined
+        if (!knowledgeTypes) {
+            knowledgeTypes = ["product", "faq", "article"]
+        } else {
+            knowledgeTypes.push("faq", "article", "product")
+        }
             
-        let knowledgeTypes = ["product", "faq", "article"]
-
         // initialize the logger handler    
         const loggerHandler = new ConsoleCallbackHandler(options.logger)
         const callbacks = await additionalCallbacks(nodeData, options)

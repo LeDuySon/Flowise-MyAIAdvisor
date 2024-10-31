@@ -87,7 +87,7 @@ class RetrievalQAChainYitec_Chains implements INode {
         const humanPrompt = prompt.promptMessages[prompt.promptMessages.length - 1]
         const messages = [systemPrompt, new MessagesPlaceholder('chat_history'), humanPrompt]
         const newPrompt = ChatPromptTemplate.fromMessages(messages)
-
+        
         const chain = newPrompt.pipe(model)
         return chain
     }
