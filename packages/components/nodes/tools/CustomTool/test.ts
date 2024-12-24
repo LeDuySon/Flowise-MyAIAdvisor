@@ -6,10 +6,10 @@ async function test() {
         '$vars': {                                                                                                                                                    
         'postgreDatabaseUri': '',
         'qdrantApiKey': '',
-        'qdrantCollectionName': '',
+        'qdrantCollectionName': 'skincare_products',
         'qdrantServerUrl': '',
         'openAIApiKey': '',
-        'embeddingModelName': ''
+        'embeddingModelName': 'text-embedding-3-small'
         },
         '$flow': {
             'chatflowId': '277ff1c2-5117-4eed-b954-4b8330742dd1',
