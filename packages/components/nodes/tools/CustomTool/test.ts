@@ -6,7 +6,7 @@ async function test() {
         '$vars': {                                                                                                                                                    
         'postgreDatabaseUri': '',
         'qdrantApiKey': '',
-        'qdrantCollectionName': 'skincare_products',
+        'qdrantCollectionName': '',
         'qdrantServerUrl': '',
         'openAIApiKey': '',
         'embeddingModelName': 'text-embedding-3-small'
