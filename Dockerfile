@@ -23,12 +23,12 @@ ENV NODE_OPTIONS=--max-old-space-size=8192
 WORKDIR /usr/src
 
 # Copy app source
-COPY . .
+# COPY . .
 
-RUN pnpm install
+# RUN pnpm install
 
-RUN pnpm build
+# RUN pnpm build
 
-EXPOSE 3000
+# EXPOSE 3000
 
-CMD [ "pnpm", "start" ]
+# CMD [ "pnpm", "start" ]
