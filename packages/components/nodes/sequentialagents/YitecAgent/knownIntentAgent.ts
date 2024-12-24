@@ -178,7 +178,7 @@ return [
 ]`
 const TAB_IDENTIFIER = 'selectedUpdateStateMemoryTab'
 
-class Agent_SeqAgents implements INode {
+class KnownIntentAgent_SeqAgents implements INode {
     label: string
     name: string
     version: number
@@ -193,8 +193,8 @@ class Agent_SeqAgents implements INode {
     outputs: INodeOutputsValue[]
 
     constructor() {
-        this.label = 'Agent'
-        this.name = 'seqAgent'
+        this.label = 'Known Intent Agent'
+        this.name = 'knownIntentAgent'
         this.version = 3.1
         this.type = 'Agent'
         this.icon = 'seqAgent.png'
@@ -588,8 +588,6 @@ async function createAgent(
         if (llm.bindTools === undefined) {
             throw new Error(`This agent only compatible with function calling models.`)
         }
-
-        // tool choice is required for the agent to use at least one tool
         const modelWithTools = llm.bindTools(tools)
 
         let agent
@@ -700,24 +698,6 @@ async function createAgent(
     }
 }
 
-function constructFakeLink (provider: string, productId: string): string {
-    // this function will construct fake link in format: https://{provider}.sg/{product_id}.
-    // We will use this function to replace the real link in the output.
-    return `https://${provider}.sg/${productId}`;
-}
-
-function postprocessOutput(output: string, productIdGroup: Record<string, any[]>): string {
-    // Replace the fake link in the output with the real link
-    for (const [productId, rows] of Object.entries(productIdGroup)) {
-        rows.forEach((row) => {
-            let fakeLink = constructFakeLink(row.provider, productId)
-            output = output.replace(new RegExp(fakeLink, 'g'), row.link)
-        })
-    }
-
-    return output;
-}
-
 async function agentNode(
     {
         state,
@@ -749,6 +729,7 @@ async function agentNode(
 
         // @ts-ignore
         state.messages = restructureMessages(llm, state)
+
         let result = await agent.invoke({ ...state, signal: abortControllerSignal.signal }, config)
 
         if (interrupt) {
@@ -798,18 +779,9 @@ async function agentNode(
             result.content = result.output
             delete result.output
         }
-        
-        console.log("**result.artifacts in agentNode: ", result.artifacts)
-        console.log("**result in agentNode: ", result)
 
         let outputContent = typeof result === 'string' ? result : result.content || result.output
         outputContent = removeInvalidImageMarkdown(outputContent)
-
-        // running postprocessing to replace the fake link in the output with the real link
-        if (result.artifacts && result.artifacts.length > 0) {
-            console.log("Running postprocessing to replace the fake link in the output with the real link")
-            outputContent = postprocessOutput(outputContent, result.artifacts[0])
-        }
 
         if (nodeData.inputs?.updateStateMemoryUI || nodeData.inputs?.updateStateMemoryCode) {
             let formattedOutput = {
@@ -989,8 +961,7 @@ class ToolNode<T extends BaseMessage[] | MessagesState> extends RunnableCallable
                 let output = await tool.invoke(call.args, config)
                 let sourceDocuments: Document[] = []
                 let artifacts = []
-                
-                console.log("**output in ToolNode: ", output)
+
                 if (output?.includes(SOURCE_DOCUMENTS_PREFIX)) {
                     const outputArray = output.split(SOURCE_DOCUMENTS_PREFIX)
                     output = outputArray[0]
@@ -1037,4 +1008,4 @@ class ToolNode<T extends BaseMessage[] | MessagesState> extends RunnableCallable
     }
 }
 
-module.exports = { nodeClass: Agent_SeqAgents }
+module.exports = { nodeClass: KnownIntentAgent_SeqAgents }
