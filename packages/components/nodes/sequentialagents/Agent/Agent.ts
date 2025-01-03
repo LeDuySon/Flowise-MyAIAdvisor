@@ -743,18 +743,18 @@ async function createAgent(
     }
 }
 
-function constructFakeLink (provider: string, productId: string): string {
+function constructRegexReplacePattern (provider: string, productId: string): string {
     // this function will construct fake link in format: https://{provider}.sg/{product_id}.
     // We will use this function to replace the real link in the output.
-    return `https://${provider}.sg/${productId}`;
+    return `https:\/\/[A-Za-z0-9.]*${provider}.sg\/${productId}`;
 }
 
 function postprocessOutput(output: string, productIdGroup: Record<string, any[]>): string {
     // Replace the fake link in the output with the real link
     for (const [productId, rows] of Object.entries(productIdGroup)) {
         rows.forEach((row) => {
-            let fakeLink = constructFakeLink(row.provider, productId)
-            output = output.replace(new RegExp(fakeLink, 'g'), row.link)
+            let regexReplacePattern = constructRegexReplacePattern(row.provider, productId)
+            output = output.replace(new RegExp(regexReplacePattern, 'g'), row.link)
         })
     }
 
